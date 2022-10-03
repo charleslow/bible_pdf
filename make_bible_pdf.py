@@ -8,44 +8,109 @@ import pandas as pd
 import re
 import IPython
 from pdb import set_trace
+import time
+
+BOOKS = {
+    "01": "Genesis",
+    "02": "Exodus",
+    "03": "Leviticus",
+    "04": "Numbers",
+    "05": "Deuteronomy",
+    "06": "Joshua",
+    "07": "Judges",
+    "08": "Ruth",
+    "09": "1 Samuel",
+    "10": "2 Samuel",
+    "11": "1 Kings",
+    "12": "2 Kings",
+    "13": "1 Chronicles",
+    "14": "2 Chronicles",
+    "15": "Ezra",
+    "16": "Nehemiah",
+    "17": "Esther",
+    "18": "Job",
+    "19": "Psalms",
+    "20": "Proverbs",
+    "21": "Ecclesiastes",
+    "22": "Song of Solomon",
+    "23": "Isaiah",
+    "24": "Jeremiah",
+    "25": "Lamentations",
+    "26": "Ezekiel",
+    "27": "Daniel",
+    "28": "Hosea",
+    "29": "Joel",
+    "30": "Amos",
+    "31": "Obadiah",
+    "32": "Jonah",
+    "33": "Micah",
+    "34": "Nahum",
+    "35": "Habakkuk",
+    "36": "Zephaniah",
+    "37": "Haggai",
+    "38": "Zechariah",
+    "39": "Malachi",
+    "40": "Matthew",
+    "41": "Mark",
+    "42": "Luke",
+    "43": "John",
+    "44": "Acts",
+    "45": "Romans",
+    "46": "1 Corinthians",
+    "47": "2 Corinthians",
+    "48": "Galatians",
+    "49": "Ephesians",
+    "50": "Philippians",
+    "51": "Colossians",
+    "52": "1 Thessalonians",
+    "53": "2 Thessalonians",
+    "54": "1 Timothy",
+    "55": "2 Timothy",
+    "56": "Titus",
+    "57": "Philemon",
+    "58": "Hebrews",
+    "59": "James",
+    "60": "1 Peter",
+    "61": "2 Peter",
+    "62": "1 John",
+    "63": "2 John",
+    "64": "3 John",
+    "65": "Jude",
+    "66": "Revelations"
+}
+
+SINGLE_CHAPTER_BOOKS = [
+    "Obadiah",
+    "Philemon",
+    "2 John",
+    "3 John",
+    "Jude"
+]
 
 # Read Auth Key
 with open('key.txt') as f:
     key = f.readlines()[0].strip()
 
 # Function to Download Passage
-def download_chapter(book, c1):
-    url = "https://api.esv.org/v3/passage/text/?q=" + book + "+" + str(c1)
+def download_chapter(book, c1=None):
+    url = "https://api.esv.org/v3/passage/text/?q=" + book
+    if not c1 is None:
+        url += f"+{c1}"
+
     headers = {"Authorization": key}
     params = {"include-footnotes" : "false",
               "include-passage-references" : "false",
-              "include-headings": "false"}
+              "include-headings": "true"}
     
     # Pull from API
-    r = requests.get(url, headers=headers, params=params)
-    passage = r.json()["passages"][0]
+    try:
+        r = requests.get(url, headers=headers, params=params)
+        passage = r.json()["passages"][0]
+    except:
+        print(r.json())
+        exit(1)
     
     return passage
-
-# A text class
-#class BibleText:
-#
-#    def __init__(self, text):
-#        self.text = text
-#        ends = self.findPassageEnds()
-#        for end in ends:
-#            title = self.findTitle(end)
-#
-#    def findPassageEnds(self):
-#        pattern = re.compile(r"\n[ \t]*\n")
-#        m = re.finditer(pattern, self.text)
-#        return m
-#    
-#    def findTitle(self, end):
-#        span = end.span()
-#        truncated_text = self.text[span[1]:]
-#        next_break = re.search(r"\n", truncated_text)
-#        IPython.embed();exit(1)
 
 def process_text(text):
     def replace_verse(m):
@@ -64,7 +129,6 @@ def process_text(text):
             # Append preceding content
             output.append(text[:start])
             output.append(NoEscape(f"$^{{{verse}}}\ $"))
-            #output.append(Math(data=[r"^{verse} "], inline=True))
 
             # Truncate text
             text = text[end:]
@@ -74,61 +138,75 @@ def process_text(text):
 
     return output
 
+def make_book(number, book, single_chapter=False):
 
-book = "Mark"
-chapter = 1
-geometry_options = {
-    "tmargin": "1cm", "lmargin": "1cm", 
-    "rmargin": "6cm", "bmargin": "5cm"
-    }
-doc = Document(
-    book, 
-    documentclass="article", 
-    geometry_options=geometry_options,
-    font_size="large"
-    )
+    chapter = 1
+    geometry_options = {
+        "tmargin": "1cm", "lmargin": "1cm", 
+        "rmargin": "6cm", "bmargin": "5cm"
+        }
+    doc = Document(
+        book, 
+        documentclass="article", 
+        geometry_options=geometry_options,
+        font_size="large"
+        )
 
-# Packages
-#doc.packages.append(Package(name='extsizes', options="12pt"))
-doc.packages.append(Package(name='helvet', options='scaled'))
-doc.packages.append(Package(name='setspace'))
-doc.packages.append(Package(name="titlesec"))
-doc.packages.append(Package(name='hyperref', options="bookmarks"))
-#doc.packages.append(Package(name='bookmark', options="depth=4"))
+    # Packages
+    doc.packages.append(Package(name='helvet', options='scaled'))
+    doc.packages.append(Package(name='setspace'))
+    doc.packages.append(Package(name="titlesec"))
+    doc.packages.append(Package(name='hyperref'))
+    doc.packages.append(Package(name='bookmark'))
 
-# Preambles
-doc.preamble.append(NoEscape(r"\renewcommand\familydefault{\sfdefault}"))
-doc.preamble.append(NoEscape(r"\setstretch{1.5}"))
-doc.preamble.append(NoEscape(r"\titleformat*{\section}{\Huge\bfseries}"))
-doc.preamble.append(NoEscape(r"\hypersetup{pdftex,colorlinks=true,allcolors=blue}"))
-#\hypersetup{pdftex,colorlinks=true,allcolors=blue}
-#doc.preamble.append(Command("tableofcontents"))
+    # Preambles
+    doc.preamble.append(NoEscape(r"\renewcommand\familydefault{\sfdefault}"))
+    doc.preamble.append(NoEscape(r"\setstretch{1.5}"))
+    doc.preamble.append(NoEscape(r"\titleformat*{\section}{\Huge\bfseries}"))
+    doc.preamble.append(NoEscape(r"\setcounter{secnumdepth}{0}"))
 
- 
-prev_text = ""
-while True:
+    
+    prev_text = ""
+    while True:
 
-    # Process text
-    text = download_chapter(book, chapter)
-    output = process_text(text)
+        # Process text
+        if not single_chapter:
+            text = download_chapter(book, chapter)
+        else:
+            text = download_chapter(book)
 
-    if text == prev_text:
-        break
-    if chapter > 2:
-        print("Triggered")
-        break
+        output = process_text(text)
 
-    if chapter > 1:
-        doc.append(NewPage())
+        if text == prev_text:
+            break
 
-    chapter_name = book + " " + str(chapter)
-    with doc.create(Section(chapter_name, numbering=False)):
-        print(f"Processing {book} {chapter}...")
-        doc.append(NoEscape(r"\bigskip"))
-        for o in output:
-            doc.append(o)
+        if chapter > 1:
+            doc.append(NewPage())
 
-    prev_text = text
-    chapter += 1
+        chapter_name = book + " " + str(chapter)
+        with doc.create(Section(chapter_name, numbering=True)):
+            print(f"Processing {book} {chapter}...")
+            doc.append(NoEscape(r"\bigskip"))
+            for o in output:
+                doc.append(o)
 
-doc.generate_pdf(clean_tex=False)
+        prev_text = text
+        chapter += 1
+        time.sleep(5)
+
+        if single_chapter:
+            break
+
+    doc.generate_pdf(f"outputs/{number}-{book}", clean_tex=False)
+
+if __name__ == "__main__":
+    for number, book in BOOKS.items():
+        if not (book in SINGLE_CHAPTER_BOOKS[1:]):
+            continue
+
+        try:
+            single_chapter = (book in SINGLE_CHAPTER_BOOKS)
+            make_book(number, book, single_chapter=single_chapter)
+        except:
+            print(f"Error occurred for {number}-{book}...")
+            pass

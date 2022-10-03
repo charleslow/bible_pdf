@@ -1,5 +1,5 @@
-*.pdf
 *.tex
 *.toc
+*.zip
 .ipynb_checkpoints/
 key.txt
