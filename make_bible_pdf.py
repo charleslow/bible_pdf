@@ -76,20 +76,38 @@ BOOKS = {
     "63": "2 John",
     "64": "3 John",
     "65": "Jude",
-    "66": "Revelations"
+    "66": "Revelations",
 }
 
-SINGLE_CHAPTER_BOOKS = [
-    "Obadiah",
-    "Philemon",
-    "2 John",
-    "3 John",
-    "Jude"
-]
+SINGLE_CHAPTER_BOOKS = ["Obadiah", "Philemon", "2 John", "3 John", "Jude"]
 
 # Read Auth Key
-with open('key.txt') as f:
+with open("key.txt") as f:
     key = f.readlines()[0].strip()
+
+
+def download_book(book, single_chapter: bool = False):
+    """Download a whole book"""
+    chapter = 1
+    prev_text = ""
+    results = {}
+    while True:
+        if not single_chapter:
+            text = download_chapter(book, chapter)
+        else:
+            text = download_chapter(book)
+            return {1: text}
+
+        if text == prev_text:
+            break
+
+        print(f"Processing {book} {chapter}...")
+        results[chapter] = text
+        prev_text = text
+        chapter += 1
+        time.sleep(5)
+    return results
+
 
 # Function to Download Passage
 def download_chapter(book, c1=None):
@@ -98,19 +116,21 @@ def download_chapter(book, c1=None):
         url += f"+{c1}"
 
     headers = {"Authorization": key}
-    params = {"include-footnotes" : "false",
-              "include-passage-references" : "false",
-              "include-headings": "true"}
-    
+    params = {
+        "include-footnotes": "false",
+        "include-passage-references": "false",
+        "include-headings": "true",
+    }
+
     # Pull from API
     try:
         r = requests.get(url, headers=headers, params=params)
         passage = r.json()["passages"][0]
-    except:
-        print(r.json())
-        exit(1)
-    
+    except Exception as e:
+        print(e)
+        raise
     return passage
+
 
 def process_text(text):
     def replace_verse(m):
@@ -138,26 +158,28 @@ def process_text(text):
 
     return output
 
-def make_book(number, book, single_chapter=False):
 
+def make_book(number, book, single_chapter=False):
     chapter = 1
     geometry_options = {
-        "tmargin": "1cm", "lmargin": "1cm", 
-        "rmargin": "6cm", "bmargin": "5cm"
-        }
+        "tmargin": "1cm",
+        "lmargin": "1cm",
+        "rmargin": "6cm",
+        "bmargin": "5cm",
+    }
     doc = Document(
-        book, 
-        documentclass="article", 
+        book,
+        documentclass="article",
         geometry_options=geometry_options,
-        font_size="large"
-        )
+        font_size="large",
+    )
 
     # Packages
-    doc.packages.append(Package(name='helvet', options='scaled'))
-    doc.packages.append(Package(name='setspace'))
+    doc.packages.append(Package(name="helvet", options="scaled"))
+    doc.packages.append(Package(name="setspace"))
     doc.packages.append(Package(name="titlesec"))
-    doc.packages.append(Package(name='hyperref'))
-    doc.packages.append(Package(name='bookmark'))
+    doc.packages.append(Package(name="hyperref"))
+    doc.packages.append(Package(name="bookmark"))
 
     # Preambles
     doc.preamble.append(NoEscape(r"\renewcommand\familydefault{\sfdefault}"))
@@ -165,10 +187,8 @@ def make_book(number, book, single_chapter=False):
     doc.preamble.append(NoEscape(r"\titleformat*{\section}{\Huge\bfseries}"))
     doc.preamble.append(NoEscape(r"\setcounter{secnumdepth}{0}"))
 
-    
     prev_text = ""
     while True:
-
         # Process text
         if not single_chapter:
             text = download_chapter(book, chapter)
@@ -199,14 +219,14 @@ def make_book(number, book, single_chapter=False):
 
     doc.generate_pdf(f"outputs/{number}-{book}", clean_tex=False)
 
+
 if __name__ == "__main__":
     for number, book in BOOKS.items():
-        if not (book in SINGLE_CHAPTER_BOOKS[1:]):
+        if book != "1 Timothy":
             continue
-
-        try:
-            single_chapter = (book in SINGLE_CHAPTER_BOOKS)
-            make_book(number, book, single_chapter=single_chapter)
-        except:
-            print(f"Error occurred for {number}-{book}...")
-            pass
+        results = download_book(book, single_chapter=False)
+        for chapter, text in results.items():
+            name = book if len(results) == 1 else f"{book}-{chapter}"
+            with open(f"raw/{name}.txt", "w") as f:
+                f.write(text)
+            set_trace()
